@@ -156,6 +156,7 @@ MomentState::MomentState(const Config& c)
             moment0[i].resize(maxsize);
             moment1[i].resize(maxsize, maxsize);
             moment1[i] = boost::numeric::ublas::identity_matrix<double>(maxsize);
+            moment1[i](6,6) = 0e0;
 
             load_storage(moment0[i].data(), c, vectorname+num);
 
@@ -927,7 +928,7 @@ struct ElementSBend : public MomentElementBase
                 ST.moment0[i]          = prod(transfer[i], ST.moment0[i]);
     
                 if (ST.sim_mode == 2){
-                    ST.moment1[i] = prod(transfer[i], ST.moment1[i]); 
+                    noalias(ST.moment1[i]) = prod(transfer[i], ST.moment1[i]); 
                 } else {
                     noalias(scratch)       = prod(transfer[i], ST.moment1[i]);
                     noalias(ST.moment1[i]) = prod(scratch, trans(transfer[i]));
@@ -1069,7 +1070,7 @@ struct ElementSBend : public MomentElementBase
         ST.moment0[i]    = prod(edge1, ST.moment0[i]);
 
         if (ST.sim_mode == 2){
-            ST.moment1[i] = prod(edge1, ST.moment1[i]); 
+            noalias(ST.moment1[i]) = prod(edge1, ST.moment1[i]); 
         } else {
             noalias(scratch) = prod(edge1, ST.moment1[i]);
             noalias(ST.moment1[i])      = prod(scratch, trans(edge1));
