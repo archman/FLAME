@@ -5,8 +5,8 @@ project("flame" C CXX)
 option(USE_WERROR "Treat warnings as errors" OFF)
 option(USE_PYTHON "Build python support" ON)
 option(NEED_PYTHON "Require python support" OFF)
-option(NEED_EPICS  "Require EPICS support" ON)
-option(NEED_DEMOIOC  "build flamedemo IOC executable" ON)
+option(NEED_EPICS  "Require EPICS support" OFF)
+option(NEED_DEMOIOC  "build flamedemo IOC executable" OFF)
 
 message(STATUS "Option PYTHON ${USE_PYTHON}")
 

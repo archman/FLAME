@@ -602,6 +602,33 @@ void MomentElementBase::get_misalign(const state_t &ST, const Particle &real, va
     IM = prod(scl_inv, IM);
 }
 
+unsigned MomentElementBase::get_flag(const Config& c, const std::string name, const unsigned def_value)
+{
+    unsigned read_value;
+    double check_value;
+
+    try {
+        std::string raw_inp = c.get<std::string>(name);
+        check_value = boost::lexical_cast<double>(raw_inp);
+    }catch (std::exception&){
+        try {
+            check_value = c.get<double>(name);
+        }catch (std::exception&){
+            check_value = boost::lexical_cast<double>(def_value);
+        }
+    }
+
+    //Check the value is an integer
+    try {
+        read_value = boost::lexical_cast<unsigned>(check_value);
+        if (boost::lexical_cast<double>(read_value) != check_value)
+            throw std::runtime_error("");
+    }catch (std::exception&){
+        throw  std::runtime_error(SB()<< name << " must be an unsigned integer");
+    }
+    return read_value;
+}
+
 void MomentElementBase::advance(StateBase& s)
 {
     state_t&  ST = static_cast<state_t&>(s);
@@ -834,13 +861,10 @@ struct ElementSBend : public MomentElementBase
     unsigned HdipoleFitMode;
     double L, phi, phi1, phi2, K, Ftype;
 
-
     ElementSBend(const Config& c) : base_t(c), HdipoleFitMode(0) {
-
-        std::istringstream strm(c.get<std::string>("HdipoleFitMode", "1"));
-        strm>>HdipoleFitMode;
-        if(!strm.eof() && strm.fail())
-            throw std::runtime_error("HdipoleFitMode must be an integer");
+        HdipoleFitMode = get_flag(c, "HdipoleFitMode", 1);
+        if (HdipoleFitMode != 0 && HdipoleFitMode != 1)
+            throw std::runtime_error(SB()<< "Undefined HdipoleFitMode: " << HdipoleFitMode);
 
         L     = conf().get<double>("L")*MtoMM;
         phi   = conf().get<double>("phi")*M_PI/180e0;
@@ -942,7 +966,7 @@ struct ElementSBend : public MomentElementBase
 
                 double dphis_temp = ST.moment0[i][state_t::PS_S] - phis_temp;
 
-                if (HdipoleFitMode != 1) {
+                if (!HdipoleFitMode) {
 
                     //double    di_bg, Ek00, beta00, gamma00, IonK_Bend;
                     //di_bg     = conf().get<double>("bg");
@@ -973,7 +997,7 @@ struct ElementSBend : public MomentElementBase
 
             transfer[i] = boost::numeric::ublas::identity_matrix<double>(state_t::maxsize);
 
-            if (HdipoleFitMode != 1) {
+            if (!HdipoleFitMode) {
                 double dip_bg    = conf().get<double>("bg"),
                        // Dipole reference energy.
                        dip_Ek    = (sqrt(sqr(dip_bg)+1e0)-1e0)*ST.ref.IonEs,
