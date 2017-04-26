@@ -640,13 +640,13 @@ void MomentElementBase::advance(StateBase& s)
     if ((int)ST.sim_mode == 1)
     {
         // limit to longitudinal run
-    
+
         ST.pos += length;
         ST.ref.phis   += ST.ref.SampleIonK*length*MtoMM;
 
     } else {
 
-        if(!check_cache(ST)) 
+        if(!check_cache(ST))
         {
             // need to re-calculate energy dependent terms
 
@@ -685,7 +685,7 @@ void MomentElementBase::advance(StateBase& s)
             ST.moment0[k] = prod(transfer[k], ST.moment0[k]);
 
             if (ST.sim_mode == 2){
-                ST.moment1[k] = prod(transfer[k], ST.moment1[k]); 
+                ST.moment1[k] = prod(transfer[k], ST.moment1[k]);
             } else {
                 scratch  = prod(transfer[k], ST.moment1[k]);
                 ST.moment1[k] = prod(scratch, trans(transfer[k]));
@@ -811,7 +811,7 @@ struct ElementDrift : public MomentElementBase
             transfer[i] = boost::numeric::ublas::identity_matrix<double>(state_t::maxsize);
             transfer[i](state_t::PS_X, state_t::PS_PX) = L;
             transfer[i](state_t::PS_Y, state_t::PS_PY) = L;
-            transfer[i](state_t::PS_S, state_t::PS_PS) = 
+            transfer[i](state_t::PS_S, state_t::PS_PS) =
                     -2e0*M_PI/(SampleLambda*ST.real[i].IonEs/MeVtoeV*cube(ST.real[i].bg))*L;
         }
     }
@@ -902,7 +902,7 @@ struct ElementSBend : public MomentElementBase
         if ((int)ST.sim_mode == 1)
         {
             // limit to longitudinal run
-        
+
             ST.pos += length;
             ST.ref.phis   += ST.ref.SampleIonK*length*MtoMM;
 
@@ -950,9 +950,9 @@ struct ElementSBend : public MomentElementBase
                 }
 
                 ST.moment0[i]          = prod(transfer[i], ST.moment0[i]);
-    
+
                 if (ST.sim_mode == 2){
-                    noalias(ST.moment1[i]) = prod(transfer[i], ST.moment1[i]); 
+                    noalias(ST.moment1[i]) = prod(transfer[i], ST.moment1[i]);
                 } else {
                     noalias(scratch)       = prod(transfer[i], ST.moment1[i]);
                     noalias(ST.moment1[i]) = prod(scratch, trans(transfer[i]));
@@ -978,7 +978,7 @@ struct ElementSBend : public MomentElementBase
 
                     // J.B.: this is odd.
                     //ST.real[i].phis  += IonK_Bend*length*MtoMM + dphis_temp;
-                    
+
                     ST.real[i].phis  += ST.real[i].SampleIonK*length*MtoMM + dphis_temp;
                 } else
                     ST.real[i].phis  += ST.real[i].SampleIonK*length*MtoMM + dphis_temp;
@@ -1094,7 +1094,7 @@ struct ElementSBend : public MomentElementBase
         ST.moment0[i]    = prod(edge1, ST.moment0[i]);
 
         if (ST.sim_mode == 2){
-            noalias(ST.moment1[i]) = prod(edge1, ST.moment1[i]); 
+            noalias(ST.moment1[i]) = prod(edge1, ST.moment1[i]);
         } else {
             noalias(scratch) = prod(edge1, ST.moment1[i]);
             noalias(ST.moment1[i])      = prod(scratch, trans(edge1));
@@ -1301,7 +1301,7 @@ struct ElementEDipole : public MomentElementBase
         bool   ver         = conf().get<double>("ver") == 1.0;
         double L           = conf().get<double>("L")*MtoMM,
                phi         = conf().get<double>("phi")*M_PI/180e0,
-               // fit to TLM unit.            
+               // fit to TLM unit.
                fringe_x    = conf().get<double>("fringe_x", 0e0)/MtoMM,
                fringe_y    = conf().get<double>("fringe_y", 0e0)/MtoMM,
                kappa       = conf().get<double>("asym_fac", 0e0),
@@ -1311,8 +1311,16 @@ struct ElementEDipole : public MomentElementBase
                // magnetic - 0, electrostatic - 1.
                h           = 1e0,
                Ky          = spher/sqr(rho),
-               dip_beta    = conf().get<double>("beta"),
-               dip_gamma   = 1e0/sqrt(1e0-sqr(dip_beta));
+               dip_beta    = conf().get<double>("beta");
+
+        unsigned HdipoleFitMode = get_flag(conf(), "HdipoleFitMode", 1);
+
+        if (HdipoleFitMode != 0 && HdipoleFitMode != 1)
+            throw std::runtime_error(SB()<< "Undefined HdipoleFitMode: " << HdipoleFitMode);
+
+        if (HdipoleFitMode) dip_beta = ST.ref.beta;
+
+        double dip_gamma   = 1e0/sqrt(1e0-sqr(dip_beta));
 
         for(size_t i=0; i<last_real_in.size(); i++) {
             double eta0        = (ST.real[i].gamma-1e0)/2e0,
@@ -1446,7 +1454,7 @@ struct ElementRFQcell : public MomentElementBase
             //--------------
 
             transfer[k] = boost::numeric::ublas::identity_matrix<double>(state_t::maxsize);
-           
+
             for(int i=0; i<step; i++){
 
                 double Erho = sqr(ST.real[k].beta)*(ST.real[k].IonEk+ST.real[k].IonEs)/ST.real[k].IonZ,
