@@ -187,6 +187,7 @@ MomentState::MomentState(const Config& c)
         load_storage(moment1[0].data(), c, matrixname, false);
     }
 
+    last_caviphi0 = 0e0;
     calc_rms();
 }
 
@@ -235,7 +236,6 @@ MomentState::MomentState(const MomentState& o, clone_tag t)
     ,moment0_env(o.moment0_env)
     ,moment0_rms(o.moment0_rms)
     ,moment1_env(o.moment1_env)
-    ,sim_mode(o.sim_mode)
     ,last_caviphi0(o.last_caviphi0)
 {}
 
@@ -251,7 +251,6 @@ void MomentState::assign(const StateBase& other)
     moment0_env = O->moment0_env;
     moment0_rms = O->moment0_rms;
     moment1_env = O->moment1_env;
-    sim_mode = O->sim_mode;
     last_caviphi0 = O->last_caviphi0;
     StateBase::assign(other);
 }
@@ -502,16 +501,11 @@ bool MomentState::getArray(unsigned idx, ArrayInfo& Info) {
         // Note: this array is discontigious as we reference a single member from a Particle[]
         return true;
     } else if(idx==I++) {
-        Info.name = "sim_mode";
-        Info.ptr = &sim_mode;
-        Info.type = ArrayInfo::Sizet;
-        Info.ndim = 0;
-        return true;
-    } else if(idx==I++) {
         Info.name = "last_caviphi0";
         Info.ptr = &last_caviphi0;
         Info.type = ArrayInfo::Double;
         Info.ndim = 0;
+        // driven phase [degree]
         return true;
     }
     return StateBase::getArray(idx-I, Info);
@@ -602,14 +596,13 @@ void MomentElementBase::get_misalign(const state_t &ST, const Particle &real, va
     IM = prod(scl_inv, IM);
 }
 
-unsigned MomentElementBase::get_flag(const Config& c, const std::string name, const unsigned def_value)
+unsigned MomentElementBase::get_flag(const Config& c, const std::string& name, const unsigned& def_value)
 {
     unsigned read_value;
     double check_value;
 
     try {
-        std::string raw_inp = c.get<std::string>(name);
-        check_value = boost::lexical_cast<double>(raw_inp);
+        check_value = boost::lexical_cast<double>(c.get<std::string>(name));
     }catch (std::exception&){
         try {
             check_value = c.get<double>(name);
@@ -618,11 +611,11 @@ unsigned MomentElementBase::get_flag(const Config& c, const std::string name, co
         }
     }
 
-    //Check the value is an integer
+    //Check the value is an unsigned integer
     try {
         read_value = boost::lexical_cast<unsigned>(check_value);
         if (boost::lexical_cast<double>(read_value) != check_value)
-            throw std::runtime_error("");
+            throw std::runtime_error(SB()<< name << " must be an unsigned integer");
     }catch (std::exception&){
         throw  std::runtime_error(SB()<< name << " must be an unsigned integer");
     }
@@ -875,6 +868,9 @@ struct ElementSBend : public MomentElementBase
         if ( ((float)(int)Ftype != Ftype) or (Ftype > 2e0 or Ftype < 0e0) )
             throw std::runtime_error("sbend: FringeType must be 0, 1, or 2");
 
+        HdipoleFitMode = get_flag(c, "HdipoleFitMode", 1);
+        if (HdipoleFitMode != 0 && HdipoleFitMode != 1)
+            throw std::runtime_error(SB()<< "Undefined HdipoleFitMode: " << HdipoleFitMode);
     }
     virtual ~ElementSBend() {}
     virtual const char* type_name() const {return "sbend";}
@@ -935,6 +931,7 @@ struct ElementSBend : public MomentElementBase
             for(size_t i=0; i<last_real_in.size(); i++) {
                 double phis_temp = ST.moment0[i][state_t::PS_S];
 
+            if (!HdipoleFitMode) {
                 /*
                 if ((int)Ftype != 2) {
                     ST.moment0[i]          = prod(transfer[i], ST.moment0[i]);
@@ -1124,7 +1121,7 @@ struct ElementQuad : public MomentElementBase
             // Re-initialize transport matrix.
             transfer[i] = boost::numeric::ublas::identity_matrix<double>(state_t::maxsize);
 
-            double Brho = ST.real[i].beta*(ST.real[i].IonEk+ST.real[i].IonEs)/(C0*ST.real[i].IonZ),
+            double Brho = ST.real[i].Brho(),
                    K = B2/Brho/sqr(MtoMM);
 
 
@@ -1196,8 +1193,8 @@ struct ElementSext : public MomentElementBase
                    K = B3/Brho/cube(MtoMM);
 
             for(int i=0; i<step; i++){
-                double Dx = ST.moment0[k][state_t::PS_X] - dx,
-                       Dy = ST.moment0[k][state_t::PS_Y] - dy,
+                double Dx = ST.moment0[k][state_t::PS_X],
+                       Dy = ST.moment0[k][state_t::PS_Y],
                        D2x = ST.moment1[k](state_t::PS_X, state_t::PS_X),
                        D2y = ST.moment1[k](state_t::PS_Y, state_t::PS_Y),
                        D2xy = ST.moment1[k](state_t::PS_X, state_t::PS_Y);
@@ -1207,13 +1204,6 @@ struct ElementSext : public MomentElementBase
 
                 transfer[k](state_t::PS_S, state_t::PS_PS) =
                         -2e0*M_PI/(SampleLambda*ST.real[k].IonEs/MeVtoeV*cube(ST.real[k].bg))*dL;
-
-                if (strict3Dvelocity) {
-                    //@- introduce 3d velocity integrator
-                    double sclz3d = sqr(tan(ST.moment0[k][state_t::PS_PX])) + sqr(tan(ST.moment0[k][state_t::PS_PY])) + 1e0;
-                    transfer[k](state_t::PS_S, 6) =
-                        transfer[k](state_t::PS_S, state_t::PS_PS)*(1e0/sclz3d-1e0)*ST.real[k].IonEk/MeVtoeV;
-                }
 
                 get_misalign(ST, ST.real[k], misalign[k], misalign_inv[k]);
                 noalias(scratch)     = prod(transfer[k], misalign[k]);
@@ -1263,7 +1253,7 @@ struct ElementSolenoid : public MomentElementBase
             // Re-initialize transport matrix.
             transfer[i] = boost::numeric::ublas::identity_matrix<double>(state_t::maxsize);
 
-            double Brho = ST.real[i].beta*(ST.real[i].IonEk+ST.real[i].IonEs)/(C0*ST.real[i].IonZ),
+            double Brho = ST.real[i].Brho(),
                    K    = B/(2e0*Brho)/MtoMM;
 
             GetSolMatrix(L, K, transfer[i]);
@@ -1383,7 +1373,7 @@ struct ElementEQuad : public MomentElementBase
             // V0 [V] electrode voltage and R [m] electrode half-distance.
             transfer[i] = boost::numeric::ublas::identity_matrix<double>(state_t::maxsize);
 
-            double Brho = ST.real[i].beta*(ST.real[i].IonEk+ST.real[i].IonEs)/(C0*ST.real[i].IonZ),
+            double Brho = ST.real[i].Brho(),
                    K    = 2e0*V0/(C0*ST.real[i].beta*sqr(R))/Brho/sqr(MtoMM);
 
             // Horizontal plane.

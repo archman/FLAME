@@ -191,7 +191,6 @@ struct ElementVoid : public boost::noncopyable
     inline const Config& conf() const {return p_conf;}
 
     const std::string name; //!< Name of this element (unique in its Machine)
-
     size_t index; //!< Index of this element (unique in its Machine)
 
     double length; //!< Longitudual length of this element (added to StateBase::pos)

@@ -50,20 +50,32 @@ struct ElementRFCavity : public MomentElementBase
     struct RawParams {
         std::string name, type;
         double length, aperature, E0;
+        // vector Tfit and Sfit always have ten elements
+        std::vector<double> Tfit, Sfit;
     };
-    std::vector<RawParams> lattice; // from axisData_*.txt
+    std::vector<RawParams> lattice; // from thinlenlon_*.txt
 
     numeric_table mlptable, // from CaviMlp_*.txt
-                  CavData; // from thinlenlon_*.txt
+                  CavData; // from axisData_*.txt
+
+    std::string DataPath;
+    std::string DataFile;
+    std::vector<double> SynAccTab;
+
+    double calFitPow(double kfac, const std::vector<double>& Tfit) const;
+    static std::map<std::string,boost::shared_ptr<Config> > CavConfMap;
 
     std::vector<CavTLMLineType> CavTLMLineTab; // from lattice, for each charge state
     double fRF,    // RF frequency [Hz]
            IonFys, // Synchrotron phase [rad].
-           phi_ref;
+           phi_ref,
+           cRm;
     int cavi;
     unsigned MpoleLevel;
     bool forcettfcalc;
-    unsigned EmitGrowth;
+
+    unsigned MpoleLevel,
+             EmitGrowth;
 
     ElementRFCavity(const Config& c);
 
@@ -75,6 +87,9 @@ struct ElementRFCavity : public MomentElementBase
                    const double EfieldScl, const double IonFyi_s,
                    const double IonEk_s, state_t::matrix_t &M,
                    CavTLMLineType &linetab) const;
+
+    void GetCavMatGeneric(Particle &real, const double EfieldScl, const double IonFyi_s,
+                                const double IonEk_s, state_t::matrix_t &M, CavTLMLineType &linetab) const;
 
     void GenCavMat2(const int cavi, const double dis, const double EfieldScl, const double TTF_tab[],
                    const double beta_tab[], const double gamma_tab[], const double Lambda,
@@ -112,8 +127,9 @@ struct ElementRFCavity : public MomentElementBase
         fRF           = O->fRF;
         IonFys        = O->IonFys;
         phi_ref       = O->phi_ref;
-        EmitGrowth    = O->EmitGrowth;
         MpoleLevel    = O->MpoleLevel;
+        EmitGrowth    = O->EmitGrowth;
+        cRm           = O->cRm;
         cavi          = O->cavi;
         forcettfcalc  = O->forcettfcalc;
     }
@@ -205,6 +221,9 @@ struct ElementRFCavity : public MomentElementBase
             ST.last_caviphi0 = fmod(phi_ref *180e0/M_PI,360e0);
             ST.calc_rms();
         }
+
+        ST.last_caviphi0 = fmod(phi_ref*180e0/M_PI, 360e0); // driven phase [degree]
+        ST.calc_rms();
     }
 
     virtual void recompute_matrix(state_t& ST)
